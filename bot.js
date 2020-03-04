@@ -11,6 +11,20 @@ module.exports.reload = false;
 
 module.exports.bot = bot;
 
+var mysql = require('mysql');
+
+var con = mysql.createConnection({
+  host: "localhost",
+  user: "yourusername",
+  password: "yourpassword"//,
+  //database: "mydb"
+});
+
+con.connect(function(err) {
+  if (err) throw err;
+  console.log("MySQL connection successful!");
+});
+
 bot.commands = new Discord.Collection();  
 
   fs.readdir('./commands/', (err, files) => {
