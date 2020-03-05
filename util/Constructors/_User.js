@@ -58,4 +58,8 @@ module.exports = class _User {
         return prop.help.permission <= this.getGroup || this.hasCommadPerm(prop.help.name);
     }
 
+    static users(){
+        return users;
+    }
+
 }
