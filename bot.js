@@ -7,9 +7,19 @@ const _User = require("./util/Constructors/_User");
 const _Role = require("./util/Constructors/_Role");
 require("dotenv").config();
 
+var punishments = require('./storage/punishments.json');
+
 module.exports.reload = false;
 
 module.exports.bot = bot;
+
+var logsEnabled
+
+if(!settings.logsChannelId || settings.logsChannelId == '' || settings.logsChannelId.toLowerCase() == 'false'){
+    logsEnabled = false;
+} else {
+    logsEnabled = true;
+}
 
 /*var mysql = require('mysql');
 
@@ -71,6 +81,8 @@ bot.on("ready", async () => {
 
 bot.on("message", async message => {
 
+  updateModerations(message);
+
 	if(message.author.bot) return;
   if(message.channel.type === "dm") return;
   
@@ -93,6 +105,104 @@ bot.on("message", async message => {
   }
     
 });
+
+/**
+ * 
+ * @param {Message} message 
+ */
+
+function updateModerations(message){
+
+  let map = new Map(Object.entries(punishments));
+
+  let date = new Date();
+
+  let muterole = message.guild.roles.find('name', 'muted');
+
+  map.forEach((v, k) => {
+    if(v.ban) {
+      if(toConstrastDate(new Date(v.ban)) <= toConstrastDate(date)){
+        bot.fetchUser(k).then(user => {
+        delete v.ban;
+        fs.writeFile('./storage/punishments.json', JSON.stringify(punishments), err => {
+          if(err) console.log(err);
+        })
+        if(!user) return;
+        message.guild.fetchBans().then(val => {
+          if(val.has(user.id)){
+            message.guild.unban(user);
+            if(logsEnabled){
+                let channel = message.guild.channels.filter((channel) => channel.type == 'text').get(settings.logsChannelId);
+                let logEmbed = new Discord.RichEmbed()
+                    .setColor('GREEN')
+                    .setAuthor('Unban')
+                    .setDescription(`
+                    **User**: <@${k}>
+                    **Moderator**: Auto`)
+                    .setTimestamp(new Date())
+                    .setThumbnail(user.avatarURL);
+                channel.send(logEmbed);
+            }
+          }
+        })
+      });  
+      }
+    }
+    if(v.mute) {
+      if(toConstrastDate(new Date(v.mute)) <= toConstrastDate(date)) {
+        delete v.mute;
+        fs.writeFile('./storage/punishments.json', JSON.stringify(punishments), err => {
+          if(err) console.log(err);
+        })
+        let user = message.guild.members.get(k);
+        if(!user) return;
+        if(!message.guild.members.get(user.id).roles.get(muterole.id)) return;
+        message.guild.members.get(user.id).removeRole(muterole.id);
+        if(logsEnabled){
+            let channel = message.guild.channels.filter((channel) => channel.type == 'text').get(settings.logsChannelId);
+            let logEmbed = new Discord.RichEmbed()
+                .setColor('GREEN')
+                .setAuthor('Unmute')
+                .setDescription(`
+                **User**: <@${user.id}>
+                **Moderator**: Auto`)
+                .setTimestamp(new Date())
+                .setThumbnail(user.avatarURL);
+            channel.send(logEmbed);
+        } 
+      }
+    }
+  });
+
+}
+
+/**
+ * 
+ * @param {Date} date 
+ * @returns {Number}
+ */
+
+function toConstrastDate(date){
+
+  var month = date.getMonth();
+
+  if(`${date.getMonth()}`.length == 1) month = `0${date.getMonth()}`;
+
+  var day = date.getDate()
+
+  if(`${date.getDate()}`.length == 1) day = `0${date.getDate()}`;
+
+  var hours = date.getHours();
+
+  if(`${date.getHours()}`.length == 1) hours = `0${date.getHours()}`;
+
+  var minutes = date.getMinutes();
+
+  if(`${date.getMinutes()}`.length == 1) minutes = `0${date.getMinutes()}`;
+
+  return parseInt(`${date.getFullYear()}${month}${day}${hours}${minutes}`)
+
+}
 
 function hasPermissionRoles(message, prop){
   let member = message.guild.members.get(message.author.id);
