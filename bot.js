@@ -5,7 +5,12 @@ const bot = new Discord.Client({disableEveryone: true});
 const fs = require("fs");
 const _User = require("./util/Constructors/_User");
 const _Role = require("./util/Constructors/_Role");
+const Colors = require('./util/Enums/Colors.js')
 require("dotenv").config();
+const sqlite3 = require('sqlite3');
+const Database = require('./Database.js');
+
+let db = Database.getDB();
 
 var punishments = require('./storage/punishments.json');
 
@@ -20,20 +25,6 @@ if(!settings.logsChannelId || settings.logsChannelId == '' || settings.logsChann
 } else {
     logsEnabled = true;
 }
-
-/*var mysql = require('mysql');
-
-var con = mysql.createConnection({
-  host: "localhost",
-  user: "yourusername",
-  password: "yourpassword"//,
-  //database: "mydb"
-});
-
-con.connect(function(err) {
-  if (err) throw err;
-  console.log("MySQL connection successful!");
-});*/
 
 bot.commands = new Discord.Collection();  
 
@@ -85,6 +76,8 @@ bot.on("message", async message => {
 
 	if(message.author.bot) return;
   if(message.channel.type === "dm") return;
+
+  updateXp(message);
   
 	let messageArray = message.content.split(" ");
 	let cmd = messageArray[0];
@@ -203,6 +196,54 @@ function toConstrastDate(date){
   return parseInt(`${date.getFullYear()}${month}${day}${hours}${minutes}`)
 
 }
+
+/**
+ * 
+ * @param {Message} message
+ */
+
+ function updateXp(message){
+   
+  db.all("SELECT * FROM profiles WHERE userId = ?", [`${message.author.id}`], (err, rows) => {
+    if(err) console.log(err);
+    if(rows.length > 0){
+      rows.forEach(val => {
+        var xp = val.xp;
+        let oldLevel = getLevel(xp);
+        xp++
+        let newLevel = getLevel(xp);
+        if(newLevel > oldLevel){
+          let embed = new Discord.RichEmbed()
+            .setColor(Colors.INFO)
+            .setDescription(`<@${message.author.id}> has leveled up to level ${newLevel}!`)
+          message.channel.send(embed);
+        }
+        db.run("UPDATE profiles SET xp = ? WHERE userId = ?", [xp, `${message.author.id}`], err => {
+          if(err) console.log(err);
+        })
+      })
+    } else {
+      db.run("INSERT INTO profiles (userId, xp, money, status) VALUES (?, ?, ?, ?)", [`${message.author.id}`, 1, 0, "Playing Kings Royale"], err => {
+        console.log(err);
+      })
+    }
+  })
+
+ }
+
+ function getLevel(xp){
+
+  var consXp = 0;
+  var level = 0;
+
+  while(xp >= consXp){
+    consXp += (level * 0.1) * 100 + 100;
+    level++;
+  }
+
+  return level;
+
+ }
 
 function hasPermissionRoles(message, prop){
   let member = message.guild.members.get(message.author.id);
